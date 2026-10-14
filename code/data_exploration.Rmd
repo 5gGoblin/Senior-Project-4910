@@ -1,0 +1,457 @@
+---
+title: "Cars Data Cleaning"
+output: pdf_document
+---
+```{r}
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(stringr)
+```
+
+```{r}
+all_cars <- read.csv("../data/cars-1945-2020.csv",
+                     na.strings = c("", " ", "NA"),
+                     strip.white = TRUE)
+```
+
+
+```{r}
+names(all_cars)[1:10]
+```
+
+# Step 2: Scope the Rows
+
+Filter by year (200-2020)
+```{r}
+cars <- filter(all_cars, Year_from >= 2000 & Year_to <= 2020)
+head(cars)
+```
+
+Find duplicated cars and drop them
+
+```{r}
+dup_exact <- cars %>%
+  select(-id_trim) %>%
+  duplicated()
+
+sum(dup_exact)  
+cars[dup_exact, ] %>% head(10) 
+cars <- cars[!dup_exact, ]
+```
+
+Rows with the same Make, Model, Generation, Series, and Trim whose spec values differ
+```{r}
+key_cols <- c("Make", "Modle", "Generation", "Series", "Trim")
+
+key_dups <- cars %>%
+  group_by(across(all_of(key_cols))) %>%
+  filter(n() > 1) %>%
+  arrange(across(all_of(key_cols))) %>%
+  ungroup()
+
+nrow(key_dups)
+key_dups %>% select(all_of(key_cols), Year_from, engine_hp, curb_weight_kg) %>% head(20)
+```
+
+# Step 3: Standardize Missingness
+
+Histogram of how filled-in each row is.
+```{r}
+id_cols <- c("id_trim", "Make", "Modle", "Generation", "Series", "Trim", "Year_from", "Year_to")
+
+cars <- cars %>%
+  mutate(pct_filled = rowMeans(!is.na(across(-all_of(id_cols)))))
+
+summary(cars$pct_filled)
+hist(cars$pct_filled, breaks = 50)
+cars[,]
+```
+
+Inspect histogram clusters 
+(0.10–0.20)
+```{r}
+low <- cars %>% filter(pct_filled > 0.05, pct_filled < 0.30)
+
+nrow(low)
+count(low, engine_type, sort = TRUE)       
+count(low, Make, sort = TRUE) %>% head(15) 
+count(low, Year_from) %>% arrange(desc(n)) %>% head(10)
+```
+Which columns are filed in for these (low)
+```{r}
+low %>%
+  summarise(across(-all_of(id_cols), ~ mean(!is.na(.x)))) %>%
+  pivot_longer(everything(), names_to = "col", values_to = "filled") %>%
+  filter(filled > 0.5) %>%
+  arrange(desc(filled))
+```
+
+Since low (.10-.20 filled) is mostly talking about dimensions, we can drop them.
+Record what you dropped so you can describe it in the methods section:
+
+```{r}
+#cars <- cars %>% filter(pct_filled >= 0.30)
+#nrow(cars)
+
+#dropped
+#count(low, Make, sort = TRUE) %>% head(10)
+```
+
+Check if dataset has pairs of columns that mean the same thing. 
+Example `front_track_width_mm` and `front_track_mm`
+
+
+```{r}
+cars_check <- cars %>%   # run this on the version BEFORE the filter above
+  mutate(grp = ifelse(pct_filled < 0.30, "low", "main")) %>%
+  group_by(grp) %>%
+  summarise(across(c(front_track_mm, front_track_width_mm,
+                     rear_track_mm, back_track_width_mm,
+                     ground_clearance_mm, clearance_mm,
+                     car_class, country_of_origin, number_of_doors),
+                   ~ round(mean(!is.na(.x)), 2)))
+cars_check
+```
+
+Check that the pairs are complementary
+_both ≈ 0 and _either ≈ 0.95: complementary. Merge them.
+_both > 0: check that the values agree where both are filled
+
+
+```{r}
+cars <- cars %>% filter(pct_filled >= 0.30)
+
+num <- function(x) suppressWarnings(as.numeric(x))
+
+cars %>%
+  summarise(
+    front_either = mean(!is.na(front_track_mm) | !is.na(front_track_width_mm)),
+    front_both   = mean(!is.na(front_track_mm) & !is.na(front_track_width_mm)),
+    rear_either  = mean(!is.na(rear_track_mm)  | !is.na(back_track_width_mm)),
+    rear_both    = mean(!is.na(rear_track_mm)  & !is.na(back_track_width_mm)),
+    clr_either   = mean(!is.na(ground_clearance_mm) | !is.na(clearance_mm)),
+    clr_both     = mean(!is.na(ground_clearance_mm) & !is.na(clearance_mm))
+  )
+```
+
+```{r}
+cars %>%
+  filter(!is.na(front_track_mm), !is.na(front_track_width_mm)) %>%
+  summarise(agree = mean(num(front_track_mm) == front_track_width_mm))
+```
+
+Before merging check that the two sources use the same units
+
+```{r}
+num <- function(x) suppressWarnings(as.numeric(x))
+
+rbind(
+  front_std = summary(num(cars$front_track_mm)),
+  front_alt = summary(num(cars$front_track_width_mm)),
+  rear_std  = summary(num(cars$rear_track_mm)),
+  rear_alt  = summary(num(cars$back_track_width_mm)),
+  clr_std   = summary(num(cars$ground_clearance_mm)),
+  clr_alt   = summary(num(cars$clearance_mm))
+)
+```
+
+```{r}
+cars %>% filter(!is.na(ground_clearance_mm), is.na(num(ground_clearance_mm))) %>%
+  count(ground_clearance_mm, sort = TRUE)
+cars %>% filter(!is.na(front_track_mm), is.na(num(front_track_mm))) %>%
+  count(front_track_mm, sort = TRUE)
+```
+
+Fix the decimal commas, empty result is means success
+```{r}
+parse_dec <- function(x) suppressWarnings(as.numeric(gsub(",", ".", x)))
+
+# confirm nothing is still failing
+cars %>%
+  filter(!is.na(ground_clearance_mm), is.na(parse_dec(ground_clearance_mm))) %>%
+  count(ground_clearance_mm, sort = TRUE)
+```
+
+merge complementary columns
+```{r}
+num       <- function(x) suppressWarnings(as.numeric(x))
+parse_dec <- function(x) suppressWarnings(as.numeric(gsub(",", ".", x)))
+
+cars <- cars %>%
+  mutate(
+    front_track_mm      = coalesce(num(front_track_mm),            num(front_track_width_mm)),
+    rear_track_mm       = coalesce(num(rear_track_mm),             num(back_track_width_mm)),
+    ground_clearance_mm = coalesce(parse_dec(ground_clearance_mm), num(clearance_mm))
+  ) %>%
+  select(-front_track_width_mm, -back_track_width_mm, -clearance_mm)
+```
+
+
+check results
+```{r}
+cars %>% summarise(across(c(front_track_mm, rear_track_mm, ground_clearance_mm),
+                          ~ mean(!is.na(.x))))
+
+
+```
+
+
+# Phase 4: Fix Column types
+
+Profile every text column
+```{r}
+library(dplyr); library(tidyr); library(purrr)
+
+id_cols <- c("id_trim", "Make", "Modle", "Generation", "Series", "Trim", "label")
+
+profile_chr <- function(x) {
+  v   <- x[!is.na(x)]
+  bad <- unique(v[is.na(suppressWarnings(as.numeric(v)))])
+  tibble(
+    pct_filled  = round(length(v) / length(x), 3),
+    n_unique    = n_distinct(v),
+    pct_numeric = round(mean(!is.na(suppressWarnings(as.numeric(v)))), 3),
+    n_comma     = sum(grepl(",", v)),
+    n_pipe_x    = sum(grepl("[|x/]", v)),
+    n_range     = sum(grepl("[0-9]-[0-9]", v)),
+    bad_examples = paste(head(bad, 4), collapse = "  ;  ")
+  )
+}
+
+chr_profile <- cars %>%
+  select(where(is.character), -any_of(id_cols)) %>%
+  map_dfr(profile_chr, .id = "col") %>%
+  arrange(desc(pct_numeric))
+
+print(chr_profile, n = Inf, width = Inf)
+```
+
+
+Drop now (empty, too sparse, or junk):
+
+`overhead_camshaft`, `cylinder_bore_and_stroke_cycle_mm`, `bore_stroke_ratio`, `steering_type`: 0% filled.
+`charging_time_h`, `battery_capacity_KW_per_h`: ~0%, because there are very few EVs.
+`safety_assessment`, `rating_name`: 2%, and Excel-mangled.
+`cargo_volume_m3` (5%), `cargo_compartment_`… (6%), `load_height_mm` (6%).
+`compression_ratio` (12%), `engine_placement` (12%), `wheel_size_r14` (13%), `front_rear_axle_load_kg` (15%).
+`trailer_load_with_brakes_kg`: 30% filled, its only non-numeric value is "1,6", and towing capacity isn’t really design.
+`range_km`: derived from tank size × fuel consumption, which you already have, so it adds nothing.
+`presence_of_intercooler`: its only value is “Present”, and boost_type already covers it.
+
+Keep as metadata, not as distance features: `car_class`, `country_of_origin`, `emission_standards`. Emission standards track year and market more than design.
+
+Numeric: decimal comma ("1767,5" → 1767.5): `length_mm`, `width_mm`, `height_mm`, `wheelbase_mm`, `curb_weight_kg`, `max_trunk_capacity_l`, `capacity_cm3`, `fuel_tank_capacity_l`
+
+Numeric: first number only:
+
+`maximum_torque_n_m`: "400/2250-4750" is torque/rpm combined, so take 400.
+`max_speed_km_per_h`: "km/h" alone is junk and becomes NA.
+`number_of_seats`: "5, 7" → 5. Use whole numbers only, so "5,7" can’t become 5.7.
+
+Numeric: rpm ranges → midpoint ("4750-6500" → 5625, garbled values like "1,3" → NA): `engine_hp_rpm`, `turnover_of_maximum_torque_rpm`
+
+Categorical (fix case and synonyms, then factor): `Body_type`, `injection_type`, `cylinder_layout`, `engine_type`, `boost_type`, `drive_wheels`, `transmission`, `front_brakes`, `rear_brakes`, `fuel_grade`
+
+Hold for later: `front_suspension` and `back_suspension`. With 245 and 343 unique free-text values, they’re too messy for a single factor. Later we can pull out a few yes/no flags (independent, multi-link, McPherson, air).
+
+```{r}
+library(dplyr); library(stringr); library(purrr)
+
+# ============================================================
+# STEP 4: Fix column types
+# ============================================================
+
+# --- helpers ------------------------------------------------
+num       <- function(x) suppressWarnings(as.numeric(x))
+parse_dec <- function(x) num(str_replace(x, ",", "."))                     # "1767,5" -> 1767.5
+first_num <- function(x) parse_dec(str_extract(x, "[0-9]+([.,][0-9]+)?"))  # "400/2250-4750" -> 400
+first_int <- function(x) num(str_extract(x, "[0-9]+"))                     # "5, 7" -> 5
+rpm_mid   <- function(x) {                                                 # "4750-6500" -> 5625
+  is_rng <- str_detect(x, "^\\s*[0-9]+\\s*-\\s*[0-9]+\\s*$")
+  lo <- num(str_extract(x, "^\\s*[0-9]+"))
+  hi <- num(str_extract(x, "[0-9]+\\s*$"))
+  ifelse(is_rng & !is.na(is_rng), (lo + hi) / 2, num(x))
+}
+
+filled_before <- colSums(!is.na(cars))   # snapshot for the loss check
+
+# --- 4a. drop empty / sparse / junk columns -----------------
+drop_cols <- c("overhead_camshaft", "cylinder_bore_and_stroke_cycle_mm", "bore_stroke_ratio",
+               "steering_type", "charging_time_h", "battery_capacity_KW_per_h",
+               "safety_assessment", "rating_name", "cargo_volume_m3",
+               "cargo_compartment_length_width_height_mm", "load_height_mm",
+               "compression_ratio", "engine_placement", "wheel_size_r14",
+               "front_rear_axle_load_kg", "trailer_load_with_brakes_kg",
+               "range_km", "presence_of_intercooler")
+cars <- cars %>% select(-any_of(drop_cols))
+
+# --- 4b. numeric columns ------------------------------------
+dec_cols   <- c("length_mm", "width_mm", "height_mm", "wheelbase_mm", "curb_weight_kg",
+                "max_trunk_capacity_l", "capacity_cm3", "fuel_tank_capacity_l")
+first_cols <- c("maximum_torque_n_m", "max_speed_km_per_h")
+rpm_cols   <- c("engine_hp_rpm", "turnover_of_maximum_torque_rpm")
+
+cars <- cars %>%
+  mutate(across(all_of(dec_cols),   parse_dec),
+         across(all_of(first_cols), first_num),
+         across(all_of(rpm_cols),   rpm_mid),
+         number_of_seats = first_int(number_of_seats))
+
+# --- 4c. fuel_grade -> octane + capability flags ------------
+#   "98, 95, 92" lists accepted grades; the MINIMUM is the requirement
+#   "Ethanol" = flex-fuel;  "Gas" = LPG ("Gas (Gasoline)" = plain gasoline)
+cars <- cars %>%
+  mutate(
+    fg           = str_to_lower(fuel_grade),
+    min_octane   = map_dbl(str_extract_all(fg, "\\d{2}"),
+                           ~ { v <- num(.x); if (all(is.na(v))) NA_real_ else min(v, na.rm = TRUE) }),
+    flex_ethanol = str_detect(fg, "ethanol"),
+    lpg_capable  = str_detect(str_remove_all(fg, "gas \\(gasoline\\)|gasoline"), "\\bgas\\b")
+  ) %>%
+  select(-fg, -fuel_grade)
+
+# --- 4d. categorical: normalize text ------------------------
+#   (synonym merges + factor() come next, once we've seen the levels)
+cat_cols <- c("Body_type", "injection_type", "cylinder_layout", "engine_type", "boost_type",
+              "drive_wheels", "transmission", "front_brakes", "rear_brakes")
+
+cars <- cars %>%
+  mutate(across(all_of(cat_cols), ~ str_to_lower(str_squish(.x))))
+
+# ============================================================
+# CHECKS
+# ============================================================
+
+# 1. values lost to NA during conversion (should match known junk)
+filled_after <- colSums(!is.na(cars))
+common <- intersect(names(filled_before), names(filled_after))
+lost <- filled_before[common] - filled_after[common]
+lost[lost > 0]
+
+# 2. ranges of converted numeric columns
+summary(cars[, c(dec_cols, first_cols, rpm_cols, "number_of_seats", "min_octane")])
+
+# 3. new fuel columns
+count(cars, flex_ethanol, lpg_capable)
+table(cars$min_octane, useNA = "ifany")
+
+
+```
+
+
+
+```{r}
+# 4. category levels (for the synonym merges)
+cars <- as_tibble(cars)
+
+for (col in cat_cols) {
+  cat("\n=====", col, "=====\n")
+  print(count(cars, .data[[col]], sort = TRUE), n = Inf)
+}
+```
+
+```{r}
+cars %>%
+  group_by(engine_type) %>%
+  summarise(n = n(),
+            boost_missing = round(mean(is.na(boost_type)), 2),
+            turbo_any     = round(mean(boost_type %in% c("turbo","multi-turbo","twincharged","supercharged")), 2))
+```
+
+
+```{r}
+cars %>%
+  filter(engine_type %in% c("gasoline", "petrol")) %>%
+  mutate(hp_per_l = engine_hp / (capacity_cm3 / 1000),
+         boost_grp = case_when(is.na(boost_type)   ~ "missing",
+                               boost_type == "none" ~ "none",
+                               TRUE                 ~ "boosted")) %>%
+  group_by(engine_type, boost_grp) %>%
+  summarise(n = n(),
+            median_hp_per_l = round(median(hp_per_l, na.rm = TRUE)),
+            share_over_100  = round(mean(hp_per_l > 100, na.rm = TRUE), 2),
+            .groups = "drop")
+```
+
+
+Merge rows and conver to factor 
+```{r}
+# --- 4e. merge synonyms, then factor ------------------------
+clean_brake <- function(x) case_when(
+  is.na(x) | x == "n/a"                  ~ NA_character_,
+  str_detect(x, "ceramic|composite")     ~ "ceramic/composite",
+  str_detect(x, "drum")                  ~ "drum",
+  str_detect(x, "non ventilated|solid")  ~ "disc",
+  str_detect(x, "ventilated")            ~ "ventilated disc",   # incl. "disc ventilated", perforated
+  str_detect(x, "dis[ck]")               ~ "disc",
+  TRUE ~ x)
+
+cars <- cars %>%
+  select(-any_of(c("flex_ethanol", "lpg_capable"))) %>%      # too rare (<1%) to keep
+  mutate(
+    Body_type = case_when(
+      Body_type == "fastback"  ~ "liftback",
+      Body_type == "limousine" ~ "sedan",
+      Body_type == "targa"     ~ "cabriolet",
+      TRUE ~ Body_type),
+
+    injection_type = case_when(
+      str_detect(injection_type, "combined|direct")              ~ "direct",
+      str_detect(injection_type, "multi|distributed|^injector$") ~ "multi-point",
+      str_detect(injection_type, "central|mono|carburetor")      ~ "legacy",
+      TRUE ~ injection_type),                                     # "common rail" stays
+
+    cylinder_layout = case_when(
+      cylinder_layout == "-"                 ~ NA_character_,
+      str_detect(cylinder_layout, "^v-type") ~ "v-type",          # incl. narrow-angle VR
+      str_detect(cylinder_layout, "rotary")  ~ "rotary",
+      TRUE ~ cylinder_layout),                                    # inline, opposed, w-type
+
+    # engine_type must be merged BEFORE boost_type (boost rule uses it)
+    engine_type = case_when(
+      engine_type %in% c("gasoline", "petrol", "rotor") ~ "gasoline",
+      engine_type == "diesel"                           ~ "diesel",
+      str_detect(engine_type, "hybrid") |
+        engine_type == "gasoline, electric"             ~ "hybrid",
+      engine_type == "electric"                         ~ "electric",
+      str_detect(engine_type, "gas")                    ~ "lpg",   # "gas", "gasoline, gas", "liquefied ... gases"
+      TRUE ~ engine_type),
+
+    boost_type = case_when(
+      is.na(boost_type) & engine_type != "diesel"          ~ "none",   # NA = naturally aspirated (hp/L check)
+      boost_type %in% c("turbo", "turbine", "twin-scroll") ~ "turbo",
+      boost_type %in% c("biturbo", "triple turbo")         ~ "multi-turbo",
+      boost_type == "compressor"                           ~ "supercharged",
+      boost_type == "turbine + compressor"                 ~ "twincharged",
+      TRUE ~ boost_type),                                  # "none" stays; diesel NA stays NA
+
+    drive_wheels = case_when(
+      str_detect(drive_wheels, "front")    ~ "fwd",
+      str_detect(drive_wheels, "rear")     ~ "rwd",
+      str_detect(drive_wheels, "four")     ~ "4wd",
+      str_detect(drive_wheels, "all|full") ~ "awd",
+      TRUE ~ drive_wheels),
+
+    transmission = case_when(
+      str_detect(transmission, "robot|clutch") ~ "automated manual",   # AMT + dual-clutch
+      str_detect(transmission, "cvt")          ~ "cvt",
+      TRUE ~ transmission),                                            # manual, automatic
+
+    front_brakes = clean_brake(front_brakes),
+    rear_brakes  = clean_brake(rear_brakes)
+  ) %>%
+  mutate(across(all_of(cat_cols), factor))
+
+# --- confirm merged levels ----------------------------------
+for (col in cat_cols) {
+  cat("\n=====", col, "=====\n")
+  print(count(cars, .data[[col]], sort = TRUE), n = Inf)
+}
+```
+
+
+```{r}
+str(cars)
+```
+

@@ -1,0 +1,265 @@
+---
+title: "Data Cleaning Log: Steps 1–4"
+subtitle: "Mapping Automotive Design Similarity with Topological Data Analysis"
+date: "October 13, 2026"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+---
+
+# Overview
+
+This document records every cleaning decision made on the raw vehicle specification data before building the Gower distance matrix. For each step it gives what was done, the evidence behind it, and what was deliberately left alone, so the team can reproduce the cleaned dataset and defend each choice in the methods section.
+
+**Source.** Vehicle specification data from Opendatabay (`cars-1945-2020.csv`): 70,823 trims × 78 columns of mixed type.
+
+**Result after steps 1–4.**
+
+| | Raw data | After step 4 |
+|---|---|---|
+| Rows (trims) | 70,823 | 31,645 |
+| Scope | 1945–2020 | Generations introduced 2000 onward |
+| Column types | Mostly text, including numeric fields | Numeric, factor, and identifier columns |
+| Checkpoint file | — | `cars_step4.rds` |
+
+**Steps covered.** These follow the cleaning outline:
+
+1. Environment setup and reading the data
+2. Scoping the rows (year filter, duplicates, row completeness)
+3. Standardizing missing values and merging the alternate column schema
+4. Fixing column types (numeric parsing, dropped columns, categorical merges)
+
+Part of step 7 (row-level completeness) was done during step 2, because it came up while investigating duplicates.
+
+---
+
+# Environment and data import
+
+**`dplyr` masking.** The first filter attempt failed with `object 'Year_from' not found`. When `dplyr` isn't loaded, `filter()` resolves to `stats::filter()`, a time-series function with different arguments. The fix is to load `dplyr` before any filtering.
+
+**Reading blanks as missing.** Empty cells in the CSV are read as missing values at import, and stray whitespace is trimmed. This keeps blank strings from being counted as real values later.
+
+```{r import, eval = FALSE}
+library(dplyr)
+all_cars <- read.csv("../data/cars-1945-2020.csv",
+                     na.strings = c("", " ", "NA"),
+                     strip.white = TRUE)
+```
+
+---
+
+# Row scope
+
+## Year filter
+
+Rows were limited to vehicle generations with `Year_from >= 2000`. The source data ends in 2020, so this matches the proposal's 2000–2020 window. The period was chosen to reduce inconsistencies in older records and to focus on modern vehicle design.
+
+## Exact duplicates
+
+Rows that were identical on every column except `id_trim` were treated as scraping artifacts and removed. `id_trim` is unique on every row, so including it in the comparison would hide true duplicates.
+
+Rows removed: **[fill in]**
+
+## Same-name variants (kept)
+
+Grouping by `Make`, `Modle`, `Generation`, `Series` and `Trim` turned up many groups with more than one row. Inspecting them showed that most are **distinct vehicles sharing a trim label**, not duplicates:
+
+| Example | What the rows actually are |
+|---|---|
+| Acura CL 3.2 AT (225 vs. 260 hp) | Base CL vs. CL Type-S |
+| Acura NSX 3.0 MT (255 vs. 274 hp) | Different power versions |
+| Acura MDX 3.5 AT 4WD (NA, 240, 263 hp) | Pre- and post-update versions, plus one empty row |
+
+**Decision.** Same-name rows were kept. `id_trim` is the unique key for every vehicle. To tell variants apart in the web app, a display label was built from make, model, trim, year and horsepower (for example, *Acura CL 3.2 AT (2000, 260 hp)*).
+
+> **Methods note:** Make/Model/Generation/Trim does not uniquely identify a vehicle in this dataset. Same-named trims include distinct performance variants, so `id_trim` was used as the key, and only rows lacking specification data were removed.
+
+## Row completeness
+
+For each row, we computed `pct_filled`: the share of non-identifier columns that have a value. Its histogram showed three distinct groups:
+
+| Group | `pct_filled` | Rows (approx.) | What it is | Decision |
+|---|---|---|---|---|
+| Empty shells | ≈ 0 | ~2,600 | No specifications at all | **Dropped** |
+| Body-only stubs | 0.10–0.20 | ~840 | Dimensions, seats, doors, country, class; no drivetrain data | **Dropped** |
+| Normal rows | 0.35–0.72 | Remainder | Full specification records | Kept |
+
+**Checking the stubs for bias.** Before dropping the 0.10–0.20 cluster, we checked whether it was mostly electric vehicles. EVs have no cylinders, bore, stroke or fuel figures, so they could score low on completeness even when fully documented. Only **1 of ~840** stub rows was electric; the other 839 had no engine type at all. Dropping the cluster does not systematically remove EVs.
+
+**Why the stubs were dropped.** The project measures *mechanical* similarity. Gower's distance compares two vehicles only on the fields they both have. A vehicle with only exterior dimensions would be placed by size alone, so it would look similar to unrelated cars of the same footprint, an artifact of missing data rather than a real relationship.
+
+**Threshold.** Rows with `pct_filled >= 0.30`, which falls in the empty gap of the histogram, were kept. This leaves **31,645 rows**.
+
+> The best rows top out at about 72% filled because `pct_filled` is measured against all original columns, many of which are sparse for every vehicle. The row threshold will be re-evaluated after the column audit in step 6, using only the final feature columns.
+
+---
+
+# Missing values and the alternate column schema
+
+## Discovery
+
+The body-only stub rows filled a different set of columns (`front_track_width_mm`, `back_track_width_mm`, `clearance_mm`, `number_of_doors`, `car_class`, `country_of_origin`) than the main rows (`front_track_mm`, `rear_track_mm`, `ground_clearance_mm`). This pointed to **two column schemas**, probably from two different scrapes, recording the same measurements under different names.
+
+Among the retained rows, about 14% use the alternate schema:
+
+| Measurement | Standard column | Alternate column | Rows with both | Either filled |
+|---|---|---|---|---|
+| Front track | `front_track_mm` (82%) | `front_track_width_mm` (14%) | 0% | 95.1% |
+| Rear track | `rear_track_mm` (82%) | `back_track_width_mm` (14%) | 0% | 95.1% |
+| Ground clearance | `ground_clearance_mm` (64%) | `clearance_mm` (12%) | 0% | 76.0% |
+
+No row has values in both columns of a pair, so the pairs are **complementary**: each row uses one schema or the other.
+
+## Merge
+
+Each pair was combined into the standard column, and the alternate column was removed. This raised coverage from 82% to 95% for track widths and from 64% to 76% for ground clearance, without adding any imputed values.
+
+## Decimal commas
+
+Before merging, we checked for text values that would fail numeric conversion. About 175 ground-clearance values used **European decimal commas** (`"190,5"` = 190.5 mm). These values are exact inch conversions (190.5 mm = 7.5 in, 266.7 mm = 10.5 in), consistent with US-spec vehicles. Commas were converted to decimal points before parsing, so no values were lost.
+
+> The comma means different things in different columns. In `range_km` (`"450|1,000"`) it is a thousands separator. Comma handling was therefore decided column by column, never applied globally.
+
+## Columns that can't be merged
+
+`car_class` and `country_of_origin` exist only in the alternate schema (about 14% coverage) and have no standard counterpart. They are kept as **metadata** and excluded from the distance calculation.
+
+---
+
+# Column types
+
+## Approach
+
+Every text column was profiled for completeness, number of unique values, share of values that convert cleanly to numbers, and the presence of commas, separators (`|`, `x`, `/`) or ranges. Each column was then put into one group: drop, clean numeric, numeric with format fixes, categorical, or compound.
+
+## Data-quality patterns found
+
+**Translation artifacts.** Many labels appear to be machine-translated from a Russian-language car database:
+
+| Label in data | Meaning |
+|---|---|
+| "turbine" (*турбина*) | Turbocharger |
+| "full" (*полный*) | All-wheel drive |
+| "robot" | Automated manual transmission |
+| "injector" (*инжектор*) | Port (multi-point) fuel injection |
+| "liquefied coal hydrogen gases" | Liquefied hydrocarbon gas (LPG) |
+
+**Spreadsheet date corruption.** Some values were mangled into dates at some point in the data's history: `safety_assessment` values like `"5-May"` (originally 5/5 stars) and `number_of_seats` values like `"4/6/2007"` (probably 4/6/7).
+
+## Dropped columns
+
+| Column(s) | Reason |
+|---|---|
+| `overhead_camshaft`, `cylinder_bore_and_stroke_cycle_mm`, `bore_stroke_ratio`, `steering_type` | 0% filled |
+| `charging_time_h`, `battery_capacity_KW_per_h` | ~0% filled (very few EVs) |
+| `safety_assessment`, `rating_name` | 2% filled; date-corrupted |
+| `cargo_volume_m3`, `cargo_compartment_length_width_height_mm`, `load_height_mm` | 5–6% filled |
+| `compression_ratio`, `engine_placement`, `wheel_size_r14`, `front_rear_axle_load_kg` | 12–15% filled |
+| `trailer_load_with_brakes_kg` | 30% filled; towing capacity is not a design property; corrupted values |
+| `range_km` | Derived from fuel tank capacity × consumption, both already present |
+| `presence_of_intercooler` | Only value is "Present"; already covered by `boost_type` |
+| `front_track_width_mm`, `back_track_width_mm`, `clearance_mm` | Merged into standard columns (section 4) |
+| `fuel_grade` | Replaced by `min_octane` (below) |
+
+**Metadata (kept, not used as distance features):** `car_class`, `country_of_origin`, `emission_standards`, and `Body_type` (see section 6). Emission standards track model year and market more than design.
+
+## Numeric conversion
+
+| Rule | Columns | Example |
+|---|---|---|
+| Decimal comma → decimal point | `length_mm`, `width_mm`, `height_mm`, `wheelbase_mm`, `curb_weight_kg`, `max_trunk_capacity_l`, `capacity_cm3`, `fuel_tank_capacity_l` | `"1767,5"` → 1767.5 |
+| First number | `maximum_torque_n_m`, `max_speed_km_per_h` | `"400/2250-4750"` (torque/rpm) → 400 |
+| First whole number | `number_of_seats` | `"5, 7"` → 5 |
+| Range midpoint | `engine_hp_rpm`, `turnover_of_maximum_torque_rpm` | `"4750-6500"` → 5625 |
+
+**Values lost in conversion.** Each loss corresponds to a known junk value:
+
+| Column | Values set to NA | Cause |
+|---|---|---|
+| `max_speed_km_per_h` | 531 | Value was the literal text `"km/h"` |
+| `engine_hp_rpm` | 4 | Garbled values such as `"1,3"` |
+| `turnover_of_maximum_torque_rpm` | 4 | Garbled values such as `"1,5,900"` |
+
+## Fuel grade
+
+The raw `fuel_grade` column mixed three kinds of information:
+
+1. **Octane requirement.** Listed as every accepted grade (`"98, 95, 92"`), so the *minimum* is the engine's actual requirement.
+2. **Flex-fuel capability** (`"95, Ethanol"`).
+3. **LPG capability** (`"95, Gas"`). In this source, "Gas" means LPG, while "Gas (Gasoline)" means plain gasoline.
+
+It was replaced by a numeric `min_octane`:
+
+| Octane | 76 | 80 | 92 | 95 | 98 | NA |
+|---|---|---|---|---|---|---|
+| Rows | 1 | 18 | 4,788 | 15,213 | 2,038 | 9,587 |
+
+Most of the NAs are diesel vehicles, where octane does not apply. The ethanol and LPG flags were extracted and then dropped: they cover only 238 and 156 vehicles (< 1% each), and LPG vehicles are already identified by `engine_type`.
+
+## Categorical merges
+
+Text was lowercased and whitespace normalized, then synonyms were merged, and each column was converted to a factor.
+
+| Column | Merges | Final levels (rows) |
+|---|---|---|
+| `engine_type` | gasoline + petrol + rotor; hybrid variants; "gas" / "gasoline, gas" / "liquefied … gases" → LPG | gasoline 21,953 · diesel 9,000 · hybrid 456 · lpg 194 · electric 40 · NA 2 |
+| `boost_type` | turbo + turbine + twin-scroll; biturbo + triple → multi-turbo; compressor → supercharged; turbine + compressor → twincharged; NA → none (non-diesel, see below) | none 16,255 · turbo 13,407 · multi-turbo 1,000 · supercharged 338 · twincharged 303 · NA 342 |
+| `injection_type` | multi-point + distributed + injector; direct + combined; central + mono + carburetor → legacy | multi-point 16,429 · direct 7,400 · common rail 6,386 · legacy 45 · NA 1,385 |
+| `cylinder_layout` | v-type + narrow-angle V (VR); rotary + rotary-piston; "-" → NA | inline 23,795 · v-type 6,889 · opposed 766 · w-type 55 · rotary 22 · NA 118 |
+| `drive_wheels` | AWD + "full" + constant AWD; 4WD kept separate | fwd 17,421 · awd 7,086 · rwd 5,559 · 4wd 1,571 · NA 8 |
+| `transmission` | robot + single-clutch + dual-clutch → automated manual | manual 14,703 · automatic 12,561 · automated manual 2,850 · cvt 1,511 · NA 20 |
+| `front_brakes` | ventilated + "disc ventilated" + perforated; ceramic + composite; "n/a" → NA | ventilated disc 27,617 · disc 3,847 · ceramic/composite 117 · drum 13 · NA 51 |
+| `rear_brakes` | same as front; "non ventilated" + solid → disc | disc 19,091 · ventilated disc 6,258 · drum 6,079 · ceramic/composite 105 · NA 112 |
+| `Body_type` | fastback → liftback; limousine → sedan; targa → cabriolet | 10 levels; 4,382 NA |
+
+**Judgment calls to be able to defend:**
+
+- *injector → multi-point:* in Russian sources, *инжектор* conventionally means port injection.
+- *4WD kept separate from AWD:* part-time 4WD with a transfer case is mechanically different from permanent AWD. "Full" was mapped to AWD.
+- *Dual-clutch → automated manual:* only 34 vehicles, and the source's "robot" category already includes DSG gearboxes.
+
+## Missing `boost_type` means naturally aspirated
+
+About 46% of `boost_type` values were missing. Two pieces of evidence show that for non-diesel engines, a missing value means **naturally aspirated**, not unknown.
+
+**1. Turbos get recorded.** Only 4% of diesel vehicles, which are almost always turbocharged after 2000, are missing a boost value, compared with 71% of gasoline vehicles.
+
+**2. Power density.** Specific output (horsepower per liter) separates boosted from naturally aspirated engines. The missing group matches the explicit "none" groups and is far from the boosted groups:
+
+| Engine | Boost value | Rows | Median hp/L | Share > 100 hp/L |
+|---|---|---|---|---|
+| gasoline | boosted | 5,253 | 102 | 61% |
+| petrol | boosted | 994 | 106 | 69% |
+| **gasoline** | **missing** | **13,830** | **70** | **3%** |
+| gasoline | none | 332 | 69 | 2% |
+| petrol | none | 1,532 | 70 | 2% |
+
+If the missing group were a mix of turbo and naturally aspirated engines, its median would fall between 70 and 102 hp/L. It sits at 70.
+
+**Decision.** For non-diesel vehicles, missing `boost_type` was set to `none`. For the 342 diesels with no value, it stays missing, because for diesels it is genuinely unknown.
+
+---
+
+# Open items carried forward
+
+## Suspicious values (step 8)
+
+These values are physically implausible or likely unit errors. They are flagged for review and have not been changed yet:
+
+| Column | Value | Likely issue |
+|---|---|---|
+| `width_mm` | max 4,705 | A length entered as width |
+| `engine_hp_rpm` | min 550 | Typo (for example, 5,500) |
+| `maximum_torque_n_m` | min 19 | Possibly kgf·m instead of N·m (19 kgf·m ≈ 186 N·m) |
+| `max_trunk_capacity_l` | min 11 | Implausible |
+| `capacity_cm3` | min 217 | Quadricycle or error |
+| `fuel_tank_capacity_l` | min 8.8 | Plug-in hybrid or error |
+
+## Decisions pending
+
+- **`Body_type` excluded from the distance matrix (proposed).** The project argues that standard categories do not reflect real design similarity. Using body type as a distance feature would build that category into the clusters. Proposed instead: use it afterwards to color Mapper nodes, which shows directly where different body types share nodes. *To be confirmed with the team and advisor.*
+- **Suspension columns.** `front_suspension` and `back_suspension` are free text with 245 and 343 unique values. Options: derive a few binary flags (independent, multi-link, McPherson, air), or drop them.
+- **Spec-identical vehicles.** Rows that differ only in identifiers (for example, rebadged platform siblings) have a Gower distance of zero. These are likely meaningful findings. The plan is to collapse them into one point for the distance matrix and keep a lookup table of every vehicle name each point represents.
+- **Column missingness audit (step 6).** Set the missingness cutoff for features, check redundant numeric pairs (for example, length vs. wheelbase, horsepower vs. torque), and fix the final feature set for Gower's distance. Then re-check the row-completeness threshold against that feature set.
