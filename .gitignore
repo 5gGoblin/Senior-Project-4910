@@ -3,7 +3,7 @@
 .RData
 .Ruserdata
 
-# data files
+# Data files
 *.csv
 *.xlsx
 *.rds
