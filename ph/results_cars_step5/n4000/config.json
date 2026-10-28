@@ -1,0 +1,34 @@
+{
+ "settings": {
+  "matrix": "/tmp/claude-0/-home-claude/3d3d5b24-9c79-5621-bca9-2f9d1c51d330/scratchpad/work/gower_output/gower.npy",
+  "N": 31645,
+  "n": 4000,
+  "seed": 0,
+  "tau": 0.05,
+  "b_min": 20,
+  "patience": 5,
+  "b_max": 200,
+  "grid": 0.002
+ },
+ "summary": {
+  "stopped": true,
+  "stop_B_per_chain": 20,
+  "diagrams_per_chain": 20,
+  "diagrams_total": 40,
+  "final_r_h1": 0.006960343320336529,
+  "final_r_h0": 0.00026960507531902453,
+  "paper_rule_first_B": null,
+  "ripser_seconds_mean": 36.47415045499802,
+  "ripser_seconds_max": 49.37036991119385,
+  "wall_seconds": 442.5957486629486,
+  "h1_points_per_subsample": 3617.149999999999,
+  "h0_points_per_subsample": 3979.2249999999995
+ },
+ "versions": {
+  "python": "3.13.17",
+  "numpy": "2.5.3",
+  "ripser": "0.6.15",
+  "pot": "0.9.7.post1"
+ },
+ "created": "2026-10-25T03:56:09"
+}

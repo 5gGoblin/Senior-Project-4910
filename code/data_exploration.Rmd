@@ -258,11 +258,7 @@ Hold for later: `front_suspension` and `back_suspension`. With 245 and 343 uniqu
 ```{r}
 library(dplyr); library(stringr); library(purrr)
 
-# ============================================================
-# STEP 4: Fix column types
-# ============================================================
-
-# --- helpers ------------------------------------------------
+#helpers
 num       <- function(x) suppressWarnings(as.numeric(x))
 parse_dec <- function(x) num(str_replace(x, ",", "."))                     # "1767,5" -> 1767.5
 first_num <- function(x) parse_dec(str_extract(x, "[0-9]+([.,][0-9]+)?"))  # "400/2250-4750" -> 400
@@ -276,7 +272,7 @@ rpm_mid   <- function(x) {                                                 # "47
 
 filled_before <- colSums(!is.na(cars))   # snapshot for the loss check
 
-# --- 4a. drop empty / sparse / junk columns -----------------
+# drop empty / sparse / junk columns 
 drop_cols <- c("overhead_camshaft", "cylinder_bore_and_stroke_cycle_mm", "bore_stroke_ratio",
                "steering_type", "charging_time_h", "battery_capacity_KW_per_h",
                "safety_assessment", "rating_name", "cargo_volume_m3",
@@ -286,7 +282,7 @@ drop_cols <- c("overhead_camshaft", "cylinder_bore_and_stroke_cycle_mm", "bore_s
                "range_km", "presence_of_intercooler")
 cars <- cars %>% select(-any_of(drop_cols))
 
-# --- 4b. numeric columns ------------------------------------
+# numeric columns 
 dec_cols   <- c("length_mm", "width_mm", "height_mm", "wheelbase_mm", "curb_weight_kg",
                 "max_trunk_capacity_l", "capacity_cm3", "fuel_tank_capacity_l")
 first_cols <- c("maximum_torque_n_m", "max_speed_km_per_h")
@@ -298,7 +294,7 @@ cars <- cars %>%
          across(all_of(rpm_cols),   rpm_mid),
          number_of_seats = first_int(number_of_seats))
 
-# --- 4c. fuel_grade -> octane + capability flags ------------
+# fuel_grade -> octane + capability flags 
 #   "98, 95, 92" lists accepted grades; the MINIMUM is the requirement
 #   "Ethanol" = flex-fuel;  "Gas" = LPG ("Gas (Gasoline)" = plain gasoline)
 cars <- cars %>%
@@ -311,7 +307,7 @@ cars <- cars %>%
   ) %>%
   select(-fg, -fuel_grade)
 
-# --- 4d. categorical: normalize text ------------------------
+# categorical: normalize text 
 #   (synonym merges + factor() come next, once we've seen the levels)
 cat_cols <- c("Body_type", "injection_type", "cylinder_layout", "engine_type", "boost_type",
               "drive_wheels", "transmission", "front_brakes", "rear_brakes")
@@ -319,20 +315,22 @@ cat_cols <- c("Body_type", "injection_type", "cylinder_layout", "engine_type", "
 cars <- cars %>%
   mutate(across(all_of(cat_cols), ~ str_to_lower(str_squish(.x))))
 
-# ============================================================
-# CHECKS
-# ============================================================
+```
 
-# 1. values lost to NA during conversion (should match known junk)
+
+Checks
+```{r}
+
+# values lost to NA during conversion (should match known junk)
 filled_after <- colSums(!is.na(cars))
 common <- intersect(names(filled_before), names(filled_after))
 lost <- filled_before[common] - filled_after[common]
 lost[lost > 0]
 
-# 2. ranges of converted numeric columns
+# ranges of converted numeric columns
 summary(cars[, c(dec_cols, first_cols, rpm_cols, "number_of_seats", "min_octane")])
 
-# 3. new fuel columns
+# new fuel columns
 count(cars, flex_ethanol, lpg_capable)
 table(cars$min_octane, useNA = "ifany")
 
@@ -342,7 +340,7 @@ table(cars$min_octane, useNA = "ifany")
 
 
 ```{r}
-# 4. category levels (for the synonym merges)
+# category levels (for the synonym merges)
 cars <- as_tibble(cars)
 
 for (col in cat_cols) {
@@ -375,15 +373,15 @@ cars %>%
 ```
 
 
-Merge rows and conver to factor 
+Merge rows and convert to factor 
 ```{r}
-# --- 4e. merge synonyms, then factor ------------------------
+# merge synonyms, then factor 
 clean_brake <- function(x) case_when(
   is.na(x) | x == "n/a"                  ~ NA_character_,
   str_detect(x, "ceramic|composite")     ~ "ceramic/composite",
   str_detect(x, "drum")                  ~ "drum",
   str_detect(x, "non ventilated|solid")  ~ "disc",
-  str_detect(x, "ventilated")            ~ "ventilated disc",   # incl. "disc ventilated", perforated
+  str_detect(x, "ventilated")            ~ "ventilated disc",   
   str_detect(x, "dis[ck]")               ~ "disc",
   TRUE ~ x)
 
@@ -443,7 +441,7 @@ cars <- cars %>%
   ) %>%
   mutate(across(all_of(cat_cols), factor))
 
-# --- confirm merged levels ----------------------------------
+# confirm merged levels
 for (col in cat_cols) {
   cat("\n=====", col, "=====\n")
   print(count(cars, .data[[col]], sort = TRUE), n = Inf)
@@ -452,6 +450,12 @@ for (col in cat_cols) {
 
 
 ```{r}
+dim(cars)
 str(cars)
+```
+
+```{r}
+saveRDS(cars, "../data/cars_step5.rds")
+write.csv(cars, "../data/cars_step5.csv")
 ```
 

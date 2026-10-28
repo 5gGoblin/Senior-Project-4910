@@ -8,3 +8,10 @@
 *.xlsx
 *.rds
 /data/
+
+# Gower matrix output (about 4 GB)
+gower_output/
+
+ph_output/
+documentation/
+untitled folder/
