@@ -1,0 +1,14 @@
+---
+title: "final_separation"
+output: pdf_document
+---
+```{r}
+cars <- read.csv("../data/cars_final_step.csv")
+names(cars)
+```
+
+```{r}
+sum(is.na(cars$air_suspension))
+table(cars$air_suspension)
+```
+

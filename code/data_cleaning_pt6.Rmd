@@ -1,0 +1,44 @@
+---
+title: "Step 6: Column Missingness Audit"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+## Load packages
+
+```{r packages}
+library(dplyr)
+library(tidyr)
+library(stringr)
+```
+
+## Import cleaned data from Step 4
+
+```{r import}
+cars <- readRDS("../data/cars_step4.rds")
+
+dim(cars)
+```
+
+Missingness Per column
+```{r}
+
+id_cols   <- c("id_trim", "Make", "Modle", "Generation", "Series", "Trim",
+               "label", "pct_filled")
+meta_cols <- c("Body_type", "car_class", "country_of_origin",
+               "emission_standards", "Year_from", "Year_to")
+
+col_audit <- cars %>%
+  select(-any_of(id_cols)) %>%
+  summarise(across(everything(), ~ round(mean(is.na(.x)), 3))) %>%
+  pivot_longer(everything(), names_to = "col", values_to = "pct_missing") %>%
+  mutate(type = sapply(cars[col], function(x) class(x)[1]),
+         role = ifelse(col %in% meta_cols, "metadata", "feature")) %>%
+  arrange(desc(pct_missing))
+
+print(col_audit, n = Inf)
+```
+
