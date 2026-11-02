@@ -1,0 +1,50 @@
+{
+ "specs only": {
+  "run": "/home/user/work/ph_output/n4000",
+  "n": 4000,
+  "N": 29741,
+  "diagrams": 40,
+  "stop_B_per_chain": 20,
+  "h1_points_per_subsample": 4033.249999999999,
+  "h1_median_birth": 0.05204341374337673,
+  "h1_max_persistence": 0.07486458122730255,
+  "h1_per_subsample_pers_gt_0.02": 542.1249999999999,
+  "h1_per_subsample_pers_gt_0.04": 13.749999999999996,
+  "h1_per_subsample_pers_gt_0.06": 0.6750000000000002,
+  "h1_per_subsample_pers_gt_0.08": 0.0,
+  "h0_subsample_median": 0.024454590864479542,
+  "h0_exact_median_nonzero": 0.008734581992030144,
+  "h0_exact_zero_edges": 1199,
+  "h0_exact_quantiles_10_50_90_99": [
+   0.001301046460866928,
+   0.008734581992030144,
+   0.03030303120613098,
+   0.055386577546596434
+  ],
+  "h0_exact_max": 0.15501131117343903
+ },
+ "specs + labels": {
+  "run": "/home/user/work/ph_output_labels/n4000",
+  "n": 4000,
+  "N": 29741,
+  "diagrams": 40,
+  "stop_B_per_chain": 20,
+  "h1_points_per_subsample": 4977.075000000001,
+  "h1_median_birth": 0.07552369683980942,
+  "h1_max_persistence": 0.10174036026000977,
+  "h1_per_subsample_pers_gt_0.02": 971.025,
+  "h1_per_subsample_pers_gt_0.04": 55.92499999999999,
+  "h1_per_subsample_pers_gt_0.06": 3.8999999999999995,
+  "h1_per_subsample_pers_gt_0.08": 0.4750000000000001,
+  "h0_subsample_median": 0.03991860710084438,
+  "h0_exact_median_nonzero": 0.01320361252874136,
+  "h0_exact_zero_edges": 729,
+  "h0_exact_quantiles_10_50_90_99": [
+   0.002366596832871437,
+   0.01320361252874136,
+   0.037995319813489914,
+   0.07024368420243267
+  ],
+  "h0_exact_max": 0.15372276306152344
+ }
+}

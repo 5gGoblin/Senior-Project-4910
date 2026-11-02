@@ -15,3 +15,8 @@ gower_output/
 ph_output/
 documentation/
 untitled folder/
+# label-comparison outputs (large)
+gower_output_labels/
+ph_output_labels/
+ph_output_compare/
+__pycache__/

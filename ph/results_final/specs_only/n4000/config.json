@@ -1,0 +1,34 @@
+{
+ "settings": {
+  "matrix": "/home/user/work/gower_output/gower.npy",
+  "N": 29741,
+  "n": 4000,
+  "seed": 0,
+  "tau": 0.01,
+  "b_min": 20,
+  "patience": 5,
+  "b_max": 60,
+  "grid": 0.002
+ },
+ "summary": {
+  "stopped": true,
+  "stop_B_per_chain": 20,
+  "diagrams_per_chain": 20,
+  "diagrams_total": 40,
+  "final_r_h1": 0.0061459410972345115,
+  "final_r_h0": 0.00047806159990139733,
+  "paper_rule_first_B": null,
+  "ripser_seconds_mean": 40.85015475153923,
+  "ripser_seconds_max": 46.996723651885986,
+  "wall_seconds": 805.6950385570526,
+  "h1_points_per_subsample": 4033.249999999999,
+  "h0_points_per_subsample": 3975.2999999999997
+ },
+ "versions": {
+  "python": "3.13.18",
+  "numpy": "2.5.3",
+  "ripser": "0.6.15",
+  "pot": "0.9.7.post1"
+ },
+ "created": "2026-11-01T01:09:36"
+}
