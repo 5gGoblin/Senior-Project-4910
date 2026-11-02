@@ -3,8 +3,8 @@
 Vietoris–Rips persistent homology (H0 and H1) of the vehicles, computed on
 random subsamples of the precomputed Gower matrix and averaged into a mean
 persistence measure, following Cao and Monod, "Approximating Persistent
-Homology for Large Datasets" (arXiv:2204.09155). The Fréchet mean is not
-implemented yet.
+Homology for Large Datasets" (arXiv:2204.09155). The Fréchet mean was
+considered and skipped (see `NOTES.md`).
 
 ## Files
 
@@ -16,7 +16,9 @@ implemented yet.
 | `exact_h0.py` | exact H0 death times for all N vehicles (minimum spanning tree) |
 | `plot_mean_measure.py` | H1 heatmap, H0 histogram vs exact H0, convergence curve, n vs n/2 comparison |
 | `test_ph.py` | pytest tests (OT against brute force, MST against Ripser, resume, plots) |
-| `NOTES.md` | method choices, where they differ from the paper, first results on cars_step5 |
+| `compare_runs.py` | side-by-side H1 heatmaps, H1 tail and H0 for two runs on different matrices |
+| `NOTES.md` | method choices, where they differ from the paper, final results, specs vs specs + labels |
+| `results_final/` | figures and `config.json` for the final-data runs (specs only and specs + labels; n = 4,000 seeds 0 and 1, n = 2,000) and `compare/` |
 | `results_cars_step5/` | figures, `history.csv` and `config.json` from the cars_step5 runs (n = 1,000, 2,000, 4,000) |
 
 ## Setup
@@ -43,6 +45,12 @@ From this folder:
     # 4. figures (written into the run folder)
     python plot_mean_measure.py ../ph_output/n2000 --exact-h0 ../ph_output/exact_h0.npy \
         --compare ../ph_output/n1000
+
+    # 5. (optional) side by side with a run on another matrix, same n and seed
+    python compare_runs.py \
+        --run ../ph_output/n4000 --exact ../ph_output/exact_h0.npy --name "specs only" \
+        --run ../ph_output_labels/n4000 --exact ../ph_output_labels/exact_h0.npy --name "specs + labels" \
+        --out-dir ../ph_output_compare
 
 - Each subsample's diagrams are saved to `diagrams/` as soon as they are done.
   Rerunning the same command resumes. Rerunning with a smaller `--tau` or larger
