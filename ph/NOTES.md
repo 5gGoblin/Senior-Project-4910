@@ -1,7 +1,8 @@
-# Subsampled PH: method notes and first results
+# Subsampled PH: method notes and results
 
-October 25, 2026. Results are on `cars_step5.csv` (31,645 vehicles, 41
-features). They need to be rerun on the final cleaned data.
+Method notes written October 25, 2026. Final-data results added November 2,
+2026 (see "Final results" below). The cars_step5 section further down is kept
+for the record; its numbers are superseded by the final data.
 
 ## What the code does
 
@@ -41,7 +42,79 @@ another n.
 The paper's Q* is computed on chain 1 and saved in `history.csv` so the two
 rules can be compared.
 
-## First results (cars_step5)
+## Final results (cars_clean, November 2026)
+
+Data: N = 29,741 vehicles. Two Gower matrices, both built with
+`../gower/build_gower.py --exclude id_trim`:
+
+| matrix | input | features |
+| --- | --- | --- |
+| specs only (main result) | `cars_clean_specs.csv` | 38 (28 numeric, 10 categorical) |
+| specs + labels (comparison) | specs plus `Make`, `Body_type` (categorical) and `Year_from` (numeric) from `cars_clean_identifiers.csv` | 41 (29 numeric, 12 categorical) |
+
+Settings for every run: τ = 0.01, B_min = 20, patience 5, grid 0.002. Main run
+n = 4,000 (seed 0), bias check n = 2,000, robustness rerun n = 4,000 with seed 1.
+All runs stopped at the minimum B = 20 per chain. Same seed means the same
+vehicles in each subsample for both matrices. Figures, `config.json` and
+`history.csv` for every run are in `results_final/`; the side-by-side figures
+are in `results_final/compare/` (made with `compare_runs.py`).
+
+### Specs only
+
+| | seed 0, n = 4,000 | seed 1, n = 4,000 | seed 0, n = 2,000 |
+| --- | --- | --- | --- |
+| final r_B (H1) | 0.006 | 0.008 | 0.009 |
+| H1 points per subsample | 4,033 | 4,027 | 1,886 |
+| H1 per subsample with persistence > 0.04 | 13.7 | 14.6 | 10.3 |
+| H1 per subsample with persistence > 0.06 | 0.68 | 0.83 | 0.98 |
+| H1 max persistence | 0.075 | 0.077 | 0.091 |
+| subsample H0 median death | 0.0245 | 0.0244 | 0.032 |
+
+- Exact H0 (MST, all vehicles): median 0.0087 with zero-length edges left out,
+  10% / 90% / 99% at 0.0013 / 0.030 / 0.055, max 0.155, 1,199 zero-length edges.
+- H1 is one connected region near the diagonal with no separate points. The
+  count above any persistence level grows with n while the maximum stays near
+  0.08, so there are no dominant loops at these sample sizes.
+- Seed robustness: OT₂² between the seed 0 and seed 1 mean H1 measures is 0.5%
+  of total persistence, the same size as the two-chain r_B. The result does not
+  depend on the seed.
+- H0 has no large gaps: 99% of merges happen below 0.055. The vehicles form one
+  connected space rather than separated groups.
+- The exact H0 curve has a bump just above 0.024. Checked on the MST edges:
+  every edge below 0.02 has zero categorical mismatches, and the bump edges
+  have exactly one (mostly `transmission`, 39%, and `drive_wheels`, 35%). A pair
+  with one mismatch cannot be closer than 1/(shared features) ≈ 0.026. For
+  Mapper, a DBSCAN ε below about 0.024 keeps automatic/manual and FWD/AWD
+  versions of the same trim apart; above it they merge.
+- DBSCAN ε candidates should come from the exact H0 (roughly 0.01–0.04), not the
+  subsample H0, which is about 3 times larger.
+
+### Specs + labels
+
+| | specs only | specs + labels |
+| --- | --- | --- |
+| exact H0 median (nonzero) | 0.0087 | 0.0132 |
+| zero-length MST edges | 1,199 | 729 |
+| MST edges joining two different makes | 20.5% | 3.8% |
+| 10 nearest neighbors with the same make (500 random vehicles) | 62% | 89% |
+| 10 nearest neighbors with the same body type | 65% | 91% |
+| H1 per subsample with persistence > 0.04 (n = 4,000, seed 0 / seed 1) | 13.7 / 14.6 | 55.9 / 54.4 |
+| H1 max persistence (seed 0 / seed 1) | 0.075 / 0.077 | 0.102 / 0.096 |
+| H1 median birth | 0.052 | 0.076 |
+
+- OT₂² between the specs-only and specs + labels mean H1 measures is 33% of
+  total persistence, against 0.3–0.5% between seeds. The difference is real, not
+  sampling noise.
+- Labels make neighborhoods mostly same-make and same-body-type and delay H0
+  merges, but H1 is still one region with no standout loops.
+- Adding columns rescales every distance (an average over 41 instead of 38
+  features), so absolute values are not directly comparable between the two.
+- The specs-only matrix stays the main result: putting the labels in the
+  distance builds the categories into the answer. The comparison itself is
+  reported: in specs-only, 38% of a vehicle's 10 nearest neighbors come from
+  another make and 35% from another body type.
+
+## First results (cars_step5, superseded)
 
 ### Timing
 
@@ -144,6 +217,8 @@ should not be quoted as a measured dimension.
 
 ## Not done yet
 
-- Fréchet mean of the H1 diagrams (GUDHI).
-- Rerun everything on the final cleaned CSV, with n from a timing test on the
-  machine used for the final run.
+- Fréchet mean of the H1 diagrams: skipped by decision (November 2026). With no
+  standout H1 features it would show the same blob as the mean measure, it is not
+  unique, and the mean measure is the estimator Cao and Monod's results cover.
+- Each label in the specs + labels matrix has weight 1/41, like each spec. Other
+  weights were not tried.
