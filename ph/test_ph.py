@@ -131,3 +131,46 @@ def test_plots_run(tmp_path):
     pm.convergence(out, cfg, str(tmp_path / "conv.png"))
     pm.compare_h1([(z, cfg), (z, cfg)], str(tmp_path / "cmp.png"))
     assert all(os.path.getsize(tmp_path / f) > 0 for f in ("h1.png", "h0.png", "conv.png", "cmp.png"))
+
+
+def test_mst_edges_form_spanning_tree_with_same_lengths():
+    from ph_core import mst_h0_edges
+    D = circle_matrix(N=120)
+    u, v, length = mst_h0_edges(D)
+    assert np.allclose(length, D[u, v])
+    assert np.allclose(length, mst_h0_deaths(D))
+    parent = list(range(len(D)))  # union-find: N - 1 edges with no cycle span the graph
+
+    def find(a):
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+
+    for a, b in zip(u, v):
+        ra, rb = find(a), find(b)
+        assert ra != rb
+        parent[ra] = rb
+
+
+def test_label_auc_matches_pair_counting():
+    from label_auc import auc, h0_edge_auc, retrieval_auc, roc_curve
+    rng = np.random.default_rng(1)
+    s = rng.integers(0, 6, 80).astype(float)
+    y = rng.random(80) < 0.4
+    pos, neg = s[y], s[~y]
+    expected = np.mean([(p > q) + 0.5 * (p == q) for p in pos for q in neg])
+    assert np.isclose(auc(s, y), expected)
+    fpr, tpr = roc_curve(s, y)
+    assert np.isclose(np.trapezoid(tpr, fpr), expected)
+
+    # two well-separated groups: cross-label merges are the longest, and same-label vehicles are closest
+    pts = np.r_[rng.normal(0, 0.1, (30, 2)), rng.normal(5, 0.1, (30, 2))]
+    D = cdist(pts, pts)
+    lab = np.array(["a"] * 30 + ["b"] * 30, dtype=object)
+    lab[3] = None
+    from ph_core import mst_h0_edges
+    u, v, length = mst_h0_edges(D)
+    res, _, _ = h0_edge_auc({"u": u, "v": v, "length": length}, lab)
+    assert res["cross_edges"] == 1 and res["auc"] == 1.0
+    assert retrieval_auc(D, lab, queries=20)["auc_mean"] == 1.0
