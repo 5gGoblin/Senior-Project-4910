@@ -6,10 +6,16 @@ Usage:
         --run ../ph_output_labels/n4000 --exact ../ph_output_labels/exact_h0.npy --name "specs + labels" \
         --out-dir ../ph_output_compare
 
+Optional H0 label AUC (needs exact_h0.py --edges for each run):
+        --edges ../ph_output/mst_edges.npz --edges ../ph_output_labels/mst_edges.npz \
+        --lookup ../gower_output/id_lookup.csv --labels ../data/cars_clean_identifiers.csv
+
 Writes into --out-dir:
     compare_h1_heatmaps.png   the two H1 mean measures on one shared colour scale
     compare_h1_tail.png       mean H1 points per subsample with persistence > x
-    compare_h0.png            exact (MST) H0 deaths and subsample H0 deaths, both runs
+    compare_h0.png            exact (MST) H0 deaths and subsample H0 deaths, both runs;
+                              with --edges, a third panel with the H0 merge ROC curves
+                              and AUC for each label column (see label_auc.py)
     compare_summary.json      the numbers quoted in the figures
 
 Both runs should use the same N, n and seed. Then subsample i of chain c holds
@@ -25,6 +31,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import LogNorm
 
+from label_auc import h0_edge_auc, load_labels
 from plot_mean_measure import CAT, INK, MUTED, SEQ, load_run
 
 
@@ -90,13 +97,15 @@ def tail(runs, names, out):
     plt.close(fig)
 
 
-def h0(runs, exacts, names, out, bin_d=0.002):
+def h0(runs, exacts, names, out, bin_d=0.002, roc=None):
+    """roc: optional list of (run name, label column, auc, fpr, tpr) for a third panel."""
     subs = [z["h0_points"][:, 1] for z, _ in runs]
     exs = [e[e > 0] for e in exacts]
     hi = np.quantile(np.concatenate(subs + exs), 0.995)
     edges = np.arange(0, hi + bin_d, bin_d)
     x = edges[:-1] + bin_d / 2
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+    ncols = 3 if roc else 2
+    fig, axes = plt.subplots(1, ncols, figsize=(6 * ncols, 4.2))
     for ax, data, title in ((axes[0], exs, "Exact H0 (MST on all vehicles), zero-length edges left out"),
                             (axes[1], subs, f"Subsample H0, n = {int(runs[0][0]['n']):,}")):
         for d, name, c in zip(data, names, CAT):
@@ -108,6 +117,20 @@ def h0(runs, exacts, names, out, bin_d=0.002):
         ax.set_title(title, loc="left")
         ax.legend(loc="upper right")
         ax.set_xlim(0, hi)
+    if roc:
+        ax = axes[2]
+        styles = {}
+        for name, col, a, fpr, tpr in roc:
+            c = CAT[names.index(name)]
+            ls = styles.setdefault(col, ["-", "--", ":", "-."][len(styles) % 4])
+            ax.plot(fpr, tpr, color=c, ls=ls, lw=1.6, label=f"{name}, {col}: AUC {a:.3f}")
+        ax.plot([0, 1], [0, 1], color=MUTED, lw=1, ls=":")
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.set_xlabel("false positive rate (within-label merges)")
+        ax.set_ylabel("true positive rate (cross-label merges)")
+        ax.set_title("Exact H0: does merge distance separate\ncross-label from within-label merges?", loc="left")
+        ax.legend(loc="lower right", fontsize=8)
     fig.tight_layout()
     fig.savefig(out, dpi=160)
     plt.close(fig)
@@ -119,6 +142,11 @@ def main():
     ap.add_argument("--exact", action="append", required=True, help="exact_h0.npy for each run, same order")
     ap.add_argument("--name", action="append", required=True, help="label for each run, same order")
     ap.add_argument("--out-dir", required=True)
+    ap.add_argument("--edges", action="append", default=[],
+                    help="mst_edges.npz from exact_h0.py --edges for each run, same order (optional)")
+    ap.add_argument("--lookup", default=None, help="id_lookup.csv (row order of the matrices)")
+    ap.add_argument("--labels", default=None, help="CSV with id_trim and the label columns")
+    ap.add_argument("--label-cols", default="Make,Body_type")
     args = ap.parse_args()
     if not len(args.run) == len(args.exact) == len(args.name) == 2:
         ap.error("give --run, --exact and --name exactly twice each")
@@ -132,7 +160,20 @@ def main():
 
     heatmaps(runs, args.name, os.path.join(args.out_dir, "compare_h1_heatmaps.png"))
     tail(runs, args.name, os.path.join(args.out_dir, "compare_h1_tail.png"))
-    h0(runs, exacts, args.name, os.path.join(args.out_dir, "compare_h0.png"))
+    roc, aucs = None, {}
+    if args.edges:
+        if len(args.edges) != 2 or not (args.lookup and args.labels):
+            ap.error("--edges needs two files plus --lookup and --labels")
+        cols = [c for c in args.label_cols.split(",") if c]
+        labels = load_labels(args.lookup, args.labels, cols)
+        roc = []
+        for name, path in zip(args.name, args.edges):
+            e = dict(np.load(path))
+            for c in cols:
+                res, fpr, tpr = h0_edge_auc(e, labels[c])
+                roc.append((name, c, res["auc"], fpr, tpr))
+                aucs.setdefault(name, {})[c] = res
+    h0(runs, exacts, args.name, os.path.join(args.out_dir, "compare_h0.png"), roc=roc)
 
     summary = {}
     for (z, cfg), ex, name, path in zip(runs, exacts, args.name, args.run):
@@ -140,6 +181,8 @@ def main():
                          "diagrams": int(z["diagrams"]),
                          "stop_B_per_chain": cfg["summary"]["stop_B_per_chain"],
                          **h1_stats(z), **h0_stats(z, ex)}
+        if name in aucs:
+            summary[name]["h0_merge_auc"] = aucs[name]
     with open(os.path.join(args.out_dir, "compare_summary.json"), "w") as f:
         json.dump(summary, f, indent=1)
     print(json.dumps(summary, indent=1))

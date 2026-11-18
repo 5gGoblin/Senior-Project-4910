@@ -13,9 +13,10 @@ considered and skipped (see `NOTES.md`).
 | `ph_core.py` | subsample slicing + Ripser, mean measure, grid binning, OT₂² between measures, exact H0 by MST |
 | `timing_test.py` | times one Ripser call at several n and suggests the largest n that fits a time budget |
 | `run_subsampled_ph.py` | the main run: two chains of subsamples, stopping rule, mean measure; resumable |
-| `exact_h0.py` | exact H0 death times for all N vehicles (minimum spanning tree) |
+| `exact_h0.py` | exact H0 death times for all N vehicles (minimum spanning tree); `--edges` also saves the edges |
 | `plot_mean_measure.py` | H1 heatmap, H0 histogram vs exact H0, convergence curve, n vs n/2 comparison |
 | `test_ph.py` | pytest tests (OT against brute force, MST against Ripser, resume, plots) |
+| `label_auc.py` | ROC AUC of the distance against make and body type: per H0 merge (MST edge) and per query vehicle |
 | `compare_runs.py` | side-by-side H1 heatmaps, H1 tail and H0 for two runs on different matrices |
 | `NOTES.md` | method choices, where they differ from the paper, final results, specs vs specs + labels |
 | `results_final/` | figures and `config.json` for the final-data runs (specs only and specs + labels; n = 4,000 seeds 0 and 1, n = 2,000) and `compare/` |
@@ -40,7 +41,8 @@ From this folder:
     python run_subsampled_ph.py ../gower_output/gower.npy --n 1000 --out-dir ../ph_output/n1000
 
     # 3. exact H0 on all vehicles
-    python exact_h0.py ../gower_output/gower.npy --out ../ph_output/exact_h0.npy
+    python exact_h0.py ../gower_output/gower.npy --out ../ph_output/exact_h0.npy \
+        --edges ../ph_output/mst_edges.npz
 
     # 4. figures (written into the run folder)
     python plot_mean_measure.py ../ph_output/n2000 --exact-h0 ../ph_output/exact_h0.npy \
@@ -50,7 +52,14 @@ From this folder:
     python compare_runs.py \
         --run ../ph_output/n4000 --exact ../ph_output/exact_h0.npy --name "specs only" \
         --run ../ph_output_labels/n4000 --exact ../ph_output_labels/exact_h0.npy --name "specs + labels" \
-        --out-dir ../ph_output_compare
+        --out-dir ../ph_output_compare \
+        --edges ../ph_output/mst_edges.npz --edges ../ph_output_labels/mst_edges.npz \
+        --lookup ../gower_output/id_lookup.csv --labels ../data/cars_clean_identifiers.csv
+
+    # 6. (optional) label AUC for one matrix, written to JSON
+    python label_auc.py --matrix ../gower_output/gower.npy --edges ../ph_output/mst_edges.npz \
+        --lookup ../gower_output/id_lookup.csv --labels ../data/cars_clean_identifiers.csv \
+        --out ../ph_output/label_auc.json
 
 - Each subsample's diagrams are saved to `diagrams/` as soon as they are done.
   Rerunning the same command resumes. Rerunning with a smaller `--tau` or larger
