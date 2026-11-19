@@ -17,6 +17,7 @@ considered and skipped (see `NOTES.md`).
 | `plot_mean_measure.py` | H1 heatmap, H0 histogram vs exact H0, convergence curve, n vs n/2 comparison |
 | `test_ph.py` | pytest tests (OT against brute force, MST against Ripser, resume, plots) |
 | `label_auc.py` | ROC AUC of the distance against make and body type: per H0 merge (MST edge) and per query vehicle |
+| `plot_auc.py` | AUC-only figure for one label (H0 merge ROC curves, per-vehicle retrieval AUC histogram) |
 | `compare_runs.py` | side-by-side H1 heatmaps, H1 tail and H0 for two runs on different matrices |
 | `NOTES.md` | method choices, where they differ from the paper, final results, specs vs specs + labels |
 | `results_final/` | figures and `config.json` for the final-data runs (specs only and specs + labels; n = 4,000 seeds 0 and 1, n = 2,000) and `compare/` |

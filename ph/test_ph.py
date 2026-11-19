@@ -173,4 +173,4 @@ def test_label_auc_matches_pair_counting():
     u, v, length = mst_h0_edges(D)
     res, _, _ = h0_edge_auc({"u": u, "v": v, "length": length}, lab)
     assert res["cross_edges"] == 1 and res["auc"] == 1.0
-    assert retrieval_auc(D, lab, queries=20)["auc_mean"] == 1.0
+    assert retrieval_auc(D, lab, queries=20)[3]["auc_mean"] == 1.0

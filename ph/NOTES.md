@@ -149,6 +149,15 @@ label perfectly.
   when the label is built in", not a result.
 - AUC here measures agreement between the distance and the assigned labels.
   There is no fitted model or held-out data.
+- Body type in detail (`plot_auc.py`, `results_final/compare/auc_body_type.png`):
+  mean retrieval AUC by the query's body type, specs only, ranges from 0.78
+  (roadster, 18 queries) and 0.76 (pickup) down to 0.60 (sedan), 0.58
+  (crossover) and 0.58 (minivan). 9.2% of query vehicles have AUC < 0.5. The
+  H0 merge ROC curve for specs only stays on the diagonal for the longest 15%
+  of merges.
+- AUC is computed with scikit-learn. It equals the Mann–Whitney U statistic
+  divided by n₁n₀ (ties ½); the first version used that rank formula and gave
+  identical numbers.
 - MST edges are not independent (they share vehicles), so the H0 merge AUC has
   no simple standard error. No bootstrap was run. The retrieval IQR shows how
   much the AUC varies between query vehicles, not the uncertainty of the mean.
