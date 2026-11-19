@@ -104,9 +104,13 @@ def ot22(P, wp, Q, wq):
 
 @numba.njit(cache=True)
 def _prim(D):
+    """Prim's algorithm on a dense matrix. Returns the N - 1 edges (u, v, length) in the order added."""
     N = D.shape[0]
     in_tree = np.zeros(N, dtype=np.bool_)
     best = np.full(N, np.inf)
+    parent = np.full(N, -1, dtype=np.int64)
+    eu = np.empty(N - 1, dtype=np.int64)
+    ev = np.empty(N - 1, dtype=np.int64)
     out = np.empty(N - 1)
     v = 0
     in_tree[0] = True
@@ -117,14 +121,24 @@ def _prim(D):
                 dj = D[v, j]
                 if dj < best[j]:
                     best[j] = dj
+                    parent[j] = v
                 if best[j] < bu:
                     u, bu = j, best[j]
         if u < 0:
             raise ValueError("graph is disconnected (NaN distances?)")
+        eu[k] = parent[u]
+        ev[k] = u
         out[k] = bu
         in_tree[u] = True
         v = u
-    return out
+    return eu, ev, out
+
+
+def mst_h0_edges(D):
+    """MST edges (u, v, length), sorted by length. Each edge is one H0 merge of the Rips filtration."""
+    eu, ev, length = _prim(D)
+    order = np.argsort(length, kind="stable")
+    return eu[order], ev[order], length[order]
 
 
 def mst_h0_deaths(D):
@@ -134,4 +148,4 @@ def mst_h0_deaths(D):
     lengths (identical vehicles) are kept; Ripser drops them.
     Do not use scipy's minimum_spanning_tree here: it treats 0 as "no edge".
     """
-    return np.sort(_prim(D))
+    return mst_h0_edges(D)[2]
