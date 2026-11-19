@@ -7,11 +7,345 @@
    "cross_share": 0.037827841291190316
   },
   "retrieval": {
-   "auc_mean": 0.7794215305324552,
+   "auc_mean": 0.7794215305324551,
    "auc_median": 0.7898395167310144,
-   "auc_q25": 0.7166782743854612,
+   "auc_q25": 0.7166782743854611,
    "auc_q75": 0.8685789308273997,
    "queries": 1999
+  },
+  "retrieval_by_label": {
+   "Acura": {
+    "queries": 4,
+    "auc_mean": 0.8546161788561034
+   },
+   "Alfa Romeo": {
+    "queries": 11,
+    "auc_mean": 0.7393299621863949
+   },
+   "Alpina": {
+    "queries": 3,
+    "auc_mean": 0.9669636364770225
+   },
+   "Aston Martin": {
+    "queries": 4,
+    "auc_mean": 0.9864177494893343
+   },
+   "Audi": {
+    "queries": 101,
+    "auc_mean": 0.7799591999242247
+   },
+   "BMW": {
+    "queries": 121,
+    "auc_mean": 0.8779584632164537
+   },
+   "Bentley": {
+    "queries": 10,
+    "auc_mean": 0.9674159307045486
+   },
+   "Brilliance": {
+    "queries": 2,
+    "auc_mean": 0.9385354979811575
+   },
+   "Buick": {
+    "queries": 3,
+    "auc_mean": 0.8967210891997679
+   },
+   "Cadillac": {
+    "queries": 9,
+    "auc_mean": 0.7539008740883741
+   },
+   "Chery": {
+    "queries": 5,
+    "auc_mean": 0.9084170316174092
+   },
+   "Chevrolet": {
+    "queries": 123,
+    "auc_mean": 0.6731463889439078
+   },
+   "Chrysler": {
+    "queries": 4,
+    "auc_mean": 0.8190579358943681
+   },
+   "Citroen": {
+    "queries": 36,
+    "auc_mean": 0.7763301392806868
+   },
+   "DS": {
+    "queries": 4,
+    "auc_mean": 0.9025312303516525
+   },
+   "Dacia": {
+    "queries": 7,
+    "auc_mean": 0.9665411195599116
+   },
+   "Daewoo": {
+    "queries": 9,
+    "auc_mean": 0.8075792886817307
+   },
+   "Daihatsu": {
+    "queries": 2,
+    "auc_mean": 0.9509716436191837
+   },
+   "Datsun": {
+    "queries": 1,
+    "auc_mean": 0.9936996928319992
+   },
+   "Dodge": {
+    "queries": 9,
+    "auc_mean": 0.8240377458980501
+   },
+   "DongFeng": {
+    "queries": 1,
+    "auc_mean": 0.9774444519181185
+   },
+   "FAW": {
+    "queries": 5,
+    "auc_mean": 0.8223558555525632
+   },
+   "Ferrari": {
+    "queries": 3,
+    "auc_mean": 0.9708447112558777
+   },
+   "Fiat": {
+    "queries": 23,
+    "auc_mean": 0.7971931232004806
+   },
+   "Ford": {
+    "queries": 87,
+    "auc_mean": 0.6653815381542599
+   },
+   "GAZ": {
+    "queries": 5,
+    "auc_mean": 0.7527346044585681
+   },
+   "GMC": {
+    "queries": 4,
+    "auc_mean": 0.9285006010961843
+   },
+   "Geely": {
+    "queries": 4,
+    "auc_mean": 0.7905831455843554
+   },
+   "Genesis": {
+    "queries": 4,
+    "auc_mean": 0.9685284809895083
+   },
+   "Great Wall": {
+    "queries": 5,
+    "auc_mean": 0.7971553566645591
+   },
+   "Haima": {
+    "queries": 3,
+    "auc_mean": 0.92810683213535
+   },
+   "Haval": {
+    "queries": 1,
+    "auc_mean": 0.9101734150003516
+   },
+   "Honda": {
+    "queries": 39,
+    "auc_mean": 0.7877739832167091
+   },
+   "Hummer": {
+    "queries": 1,
+    "auc_mean": 0.9888900100908173
+   },
+   "Hyundai": {
+    "queries": 76,
+    "auc_mean": 0.7410670623546082
+   },
+   "Infiniti": {
+    "queries": 9,
+    "auc_mean": 0.8783478114226888
+   },
+   "Isuzu": {
+    "queries": 2,
+    "auc_mean": 0.7552431022880215
+   },
+   "JAC": {
+    "queries": 5,
+    "auc_mean": 0.9491983448566685
+   },
+   "Jaguar": {
+    "queries": 14,
+    "auc_mean": 0.7855199544974901
+   },
+   "Jeep": {
+    "queries": 14,
+    "auc_mean": 0.7913485860757917
+   },
+   "Kia": {
+    "queries": 79,
+    "auc_mean": 0.7797619469116457
+   },
+   "Lamborghini": {
+    "queries": 3,
+    "auc_mean": 0.9922589164946837
+   },
+   "Lancia": {
+    "queries": 4,
+    "auc_mean": 0.8310592504225072
+   },
+   "Land Rover": {
+    "queries": 7,
+    "auc_mean": 0.883398088220084
+   },
+   "Lexus": {
+    "queries": 8,
+    "auc_mean": 0.8805850943927866
+   },
+   "Lifan": {
+    "queries": 6,
+    "auc_mean": 0.9369875200059424
+   },
+   "Lincoln": {
+    "queries": 1,
+    "auc_mean": 0.8360283709965817
+   },
+   "MG": {
+    "queries": 3,
+    "auc_mean": 0.8117625577483523
+   },
+   "Maserati": {
+    "queries": 1,
+    "auc_mean": 0.9818181137864587
+   },
+   "Mazda": {
+    "queries": 51,
+    "auc_mean": 0.7669111238340912
+   },
+   "Mercedes-Benz": {
+    "queries": 169,
+    "auc_mean": 0.7073934982120829
+   },
+   "Mini": {
+    "queries": 16,
+    "auc_mean": 0.9089809222794931
+   },
+   "Mitsubishi": {
+    "queries": 41,
+    "auc_mean": 0.682274418322508
+   },
+   "Nissan": {
+    "queries": 69,
+    "auc_mean": 0.67306843821358
+   },
+   "Opel": {
+    "queries": 77,
+    "auc_mean": 0.7953403199339668
+   },
+   "Peugeot": {
+    "queries": 43,
+    "auc_mean": 0.8119086263507426
+   },
+   "Pontiac": {
+    "queries": 5,
+    "auc_mean": 0.8105161841961575
+   },
+   "Porsche": {
+    "queries": 25,
+    "auc_mean": 0.9084140522653249
+   },
+   "Proton": {
+    "queries": 2,
+    "auc_mean": 0.9215849475383373
+   },
+   "Qoros": {
+    "queries": 1,
+    "auc_mean": 0.991856090635225
+   },
+   "RAM": {
+    "queries": 1,
+    "auc_mean": 0.9993453615500859
+   },
+   "Renault": {
+    "queries": 76,
+    "auc_mean": 0.8066621488012921
+   },
+   "Rolls-Royce": {
+    "queries": 1,
+    "auc_mean": 0.9961446593776282
+   },
+   "Rover": {
+    "queries": 2,
+    "auc_mean": 0.8695794895966602
+   },
+   "SEAT": {
+    "queries": 30,
+    "auc_mean": 0.8251590401125434
+   },
+   "Saab": {
+    "queries": 16,
+    "auc_mean": 0.956271496526609
+   },
+   "Saturn": {
+    "queries": 2,
+    "auc_mean": 0.7126914159452267
+   },
+   "Skoda": {
+    "queries": 72,
+    "auc_mean": 0.8343930013538338
+   },
+   "Smart": {
+    "queries": 2,
+    "auc_mean": 0.9634367760234677
+   },
+   "Spyker": {
+    "queries": 1,
+    "auc_mean": 1.0
+   },
+   "SsangYong": {
+    "queries": 16,
+    "auc_mean": 0.8552881993851031
+   },
+   "Subaru": {
+    "queries": 43,
+    "auc_mean": 0.9364994182396521
+   },
+   "Suzuki": {
+    "queries": 19,
+    "auc_mean": 0.8366433431245828
+   },
+   "Tata": {
+    "queries": 1,
+    "auc_mean": 0.960635721493441
+   },
+   "Tofas": {
+    "queries": 2,
+    "auc_mean": 0.9782546817060895
+   },
+   "Toyota": {
+    "queries": 129,
+    "auc_mean": 0.7149782076615698
+   },
+   "UAZ": {
+    "queries": 2,
+    "auc_mean": 0.9980450480500973
+   },
+   "VAZ (Lada)": {
+    "queries": 16,
+    "auc_mean": 0.9619022851852247
+   },
+   "Vauxhall": {
+    "queries": 11,
+    "auc_mean": 0.7790361627817469
+   },
+   "Volkswagen": {
+    "queries": 124,
+    "auc_mean": 0.717182657909029
+   },
+   "Volvo": {
+    "queries": 46,
+    "auc_mean": 0.8655667312793226
+   },
+   "ZAZ": {
+    "queries": 1,
+    "auc_mean": 0.961835464333782
+   },
+   "Zotye": {
+    "queries": 2,
+    "auc_mean": 0.9271092593838288
+   }
   }
  },
  "Body_type": {
@@ -24,9 +358,51 @@
   "retrieval": {
    "auc_mean": 0.7336861632469773,
    "auc_median": 0.7399657085823257,
-   "auc_q25": 0.6656589862785763,
+   "auc_q25": 0.6656589862785764,
    "auc_q75": 0.7962855256678532,
    "queries": 2000
+  },
+  "retrieval_by_label": {
+   "cabriolet": {
+    "queries": 74,
+    "auc_mean": 0.6960876183413025
+   },
+   "coupe": {
+    "queries": 101,
+    "auc_mean": 0.7430581917736577
+   },
+   "crossover": {
+    "queries": 292,
+    "auc_mean": 0.6862356496107719
+   },
+   "hatchback": {
+    "queries": 366,
+    "auc_mean": 0.8215332955375437
+   },
+   "liftback": {
+    "queries": 61,
+    "auc_mean": 0.7386412729504402
+   },
+   "minivan": {
+    "queries": 240,
+    "auc_mean": 0.6826403862491562
+   },
+   "pickup": {
+    "queries": 125,
+    "auc_mean": 0.815723524466165
+   },
+   "roadster": {
+    "queries": 18,
+    "auc_mean": 0.8559955187904903
+   },
+   "sedan": {
+    "queries": 441,
+    "auc_mean": 0.7009925994686363
+   },
+   "wagon": {
+    "queries": 282,
+    "auc_mean": 0.7246420670302477
+   }
   }
  }
 }

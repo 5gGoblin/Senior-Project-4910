@@ -27,33 +27,26 @@ construction and should only be read as a reference.
 """
 import argparse
 import json
+import os
 
 import numpy as np
 import pandas as pd
-from scipy.stats import rankdata
+from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_curve as sk_roc_curve
 
 
 def auc(scores, y):
-    """ROC AUC with y = 1 as the positive class (Mann-Whitney U / (n1 n0), ties 1/2)."""
-    scores = np.asarray(scores, dtype=np.float64)
+    """ROC AUC with y = 1 as the positive class (scikit-learn); NaN if one class is empty."""
     y = np.asarray(y, dtype=bool)
-    n1, n0 = int(y.sum()), int((~y).sum())
-    if n1 == 0 or n0 == 0:
+    if y.all() or not y.any():
         return np.nan
-    r = rankdata(scores)
-    return float((r[y].sum() - n1 * (n1 + 1) / 2) / (n1 * n0))
+    return float(roc_auc_score(y, scores))
 
 
 def roc_curve(scores, y):
-    """False and true positive rates for every threshold, predicting y = 1 when score >= threshold."""
-    scores = np.asarray(scores, dtype=np.float64)
-    y = np.asarray(y, dtype=bool)
-    order = np.argsort(-scores, kind="stable")
-    s, yy = scores[order], y[order]
-    last = np.r_[np.nonzero(np.diff(s))[0], len(s) - 1]  # last index of each distinct score
-    tp = np.cumsum(yy)[last]
-    fp = np.cumsum(~yy)[last]
-    return np.r_[0, fp / max(fp[-1], 1)], np.r_[0, tp / max(tp[-1], 1)]
+    """False and true positive rates, predicting y = 1 when score >= threshold (scikit-learn)."""
+    fpr, tpr, _ = sk_roc_curve(np.asarray(y, dtype=bool), scores, drop_intermediate=False)
+    return fpr, tpr
 
 
 def load_labels(lookup_csv, labels_csv, cols):
@@ -79,7 +72,10 @@ def h0_edge_auc(edges, labels):
 
 
 def retrieval_auc(D, labels, queries, seed=0):
-    """Mean over query vehicles of P(same-label vehicle closer than different-label vehicle)."""
+    """Query rows, their AUCs, the mean AUC per label value, and a summary.
+
+    Each AUC is P(a same-label vehicle is closer than a different-label vehicle).
+    """
     N = D.shape[0]
     known = np.array([x is not None for x in labels])
     codes = pd.factorize(pd.Series(labels).where(known))[0]  # -1 for missing
@@ -96,8 +92,11 @@ def retrieval_auc(D, labels, queries, seed=0):
             # closer = better, so score is -distance
             out.append(auc(-block[i, keep], same))
     out = np.array(out)
-    out = out[np.isfinite(out)]  # a query whose label is unique has no positives
-    return {"auc_mean": float(out.mean()), "auc_median": float(np.median(out)),
+    fin = np.isfinite(out)  # a query whose label is unique has no positives
+    by_label = pd.DataFrame({"label": labels[q][fin], "auc": out[fin]}).groupby("label")["auc"]
+    per_label = {str(k): {"queries": int(g.size), "auc_mean": float(g.mean())} for k, g in by_label}
+    rows, out = q[fin], out[fin]
+    return rows, out, per_label, {"auc_mean": float(out.mean()), "auc_median": float(np.median(out)),
             "auc_q25": float(np.quantile(out, 0.25)), "auc_q75": float(np.quantile(out, 0.75)),
             "queries": int(len(out))}
 
@@ -111,17 +110,20 @@ def main():
     ap.add_argument("--cols", default="Make,Body_type")
     ap.add_argument("--queries", type=int, default=2000, help="query vehicles for the retrieval AUC")
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--out", required=True, help="JSON file for the results")
+    ap.add_argument("--out", required=True, help="JSON file for the results; per-query AUCs go to the same name with .npz")
     args = ap.parse_args()
     cols = [c for c in args.cols.split(",") if c]
     labels = load_labels(args.lookup, args.labels, cols)
     edges = dict(np.load(args.edges))
     D = np.load(args.matrix, mmap_mode="r")
-    res = {}
+    res, per_query = {}, {}
     for c in cols:
         h0, _, _ = h0_edge_auc(edges, labels[c])
-        res[c] = {"h0_merge": h0, "retrieval": retrieval_auc(D, labels[c], args.queries, args.seed)}
+        rows, per_query[c], per_label, summary = retrieval_auc(D, labels[c], args.queries, args.seed)
+        per_query[c + "_rows"] = rows
+        res[c] = {"h0_merge": h0, "retrieval": summary, "retrieval_by_label": per_label}
         print(c, json.dumps(res[c]))
+    np.savez(os.path.splitext(args.out)[0] + ".npz", **per_query)
     with open(args.out, "w") as f:
         json.dump(res, f, indent=1)
 
